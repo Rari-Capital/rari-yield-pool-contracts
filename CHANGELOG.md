@@ -1,6 +1,6 @@
 # Changelog
 
-## `v1.0.0` (contracts not yet deployed; all code not yet pushed)
+## `v1.0.0` (contracts deployed 2020-10-20; all code pushed 2020-10-30)
 
 * Copied Rari Stable Pool `v2.0.0` at commit [8a0405e](https://github.com/Rari-Capital/rari-stable-pool-contracts/commit/8a0405e8dacf908c79b3fe2999c153f81fbb5108).
 * Implemented liquidity mining of RGT (Rari Governance Token) distributions.
