@@ -28,11 +28,6 @@ To install all our dependencies: `npm install`
 
 In `.env`, set `DEVELOPMENT_ADDRESS=0x45D54B22582c79c8Fb8f4c4F2663ef54944f397a` to test deployment and also set `DEVELOPMENT_ADDRESS_SECONDARY=0x1Eeb75CFad36EDb6C996f7809f30952B0CA0B5B9` to run automated tests.
 
-If you are upgrading from `v2.0.0`, set `UPGRADE_FROM_LAST_VERSION=1` to enable upgrading and configure the following:
-
-    UPGRADE_FUND_MANAGER=0x6bdaf490c5b6bb58564b3e79c8d18e8dfd270464
-    UPGRADE_FUND_TOKEN=0x9366B7C00894c3555c7590b0384e5F6a9D55659f
-
 To test the contracts, first fork the Ethereum mainnet. Begin by configuring `DEVELOPMENT_WEB3_PROVIDER_URL_TO_BE_FORKED` in `.env` (set to any mainnet Web3 HTTP provider JSON-RPC URL; we use a local `geth` instance, specifically a light client started with `geth --syncmode light --rpc --rpcapi eth,web3,debug,net`; Infura works too, but beware of latency and rate limiting). To start the fork, run `npm run ganache`. *If you would like to change the port, make sure to configure `scripts/ganache.js`, `scripts/test.sh`, and the `development` network in `truffle-config.js`.* Note that you will likely have to regularly restart your fork, especially when forking from a node without archive data or when using live 0x API responses to make currency exchanges.
 
 To deploy the contracts to your private mainnet fork: `truffle migrate --network development --skip-dry-run --reset`
@@ -50,13 +45,6 @@ If you'd like to test gasless deposits via `RariFundProxy.deposit` via the Gas S
 ## Live deployment
 
 In `.env`, configure `LIVE_DEPLOYER_ADDRESS`, `LIVE_DEPLOYER_PRIVATE_KEY`, `LIVE_WEB3_PROVIDER_URL`, `LIVE_GAS_PRICE` (ideally, use the "fast" price listed by [ETH Gas Station](https://www.ethgasstation.info/)), `LIVE_FUND_OWNER`, `LIVE_FUND_REBALANCER`, `LIVE_FUND_INTEREST_FEE_MASTER_BENEFICIARY`, and `LIVE_FUND_GSN_TRUSTED_SIGNER` to deploy to the mainnet.
-
-If you are upgrading from `v2.0.0`, set `UPGRADE_FROM_LAST_VERSION=1` to enable upgrading and configure the following:
-
-    UPGRADE_FUND_MANAGER=0x6bdaf490c5b6bb58564b3e79c8d18e8dfd270464
-    UPGRADE_FUND_TOKEN=0x9366B7C00894c3555c7590b0384e5F6a9D55659f
-
-You must also set `LIVE_UPGRADE_FUND_OWNER_PRIVATE_KEY`.
 
 Then, migrate: `truffle migrate --network live`
 
