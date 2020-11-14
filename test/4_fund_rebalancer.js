@@ -19,6 +19,13 @@ const RariFundManager = artifacts.require("RariFundManager");
 const RariFundToken = artifacts.require("RariFundToken");
 const RariFundPriceConsumer = artifacts.require("RariFundPriceConsumer");
 
+if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) {
+  RariFundController.address = process.env.UPGRADE_FUND_CONTROLLER_ADDRESS;
+  RariFundManager.address = process.env.UPGRADE_FUND_MANAGER_ADDRESS;
+  RariFundToken.address = process.env.UPGRADE_FUND_TOKEN_ADDRESS;
+  RariFundPriceConsumer.address = process.env.UPGRADE_FUND_PRICE_CONSUMER_ADDRESS;
+}
+
 // These tests expect the owner and the fund rebalancer of RariFundController and RariFundManager to be set to process.env.DEVELOPMENT_ADDRESS
 contract("RariFundManager", accounts => {
   it("should set accepted currencies", async () => {

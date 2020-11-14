@@ -17,6 +17,11 @@ const exchanges = require('./fixtures/exchanges.json');
 const RariFundController = artifacts.require("RariFundController");
 const RariFundManager = artifacts.require("RariFundManager");
 
+if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) {
+  RariFundController.address = process.env.UPGRADE_FUND_CONTROLLER_ADDRESS;
+  RariFundManager.address = process.env.UPGRADE_FUND_MANAGER_ADDRESS;
+}
+
 var zeroExExchange = new ZeroExExchange(web3);
 
 // These tests expect the owner and the fund rebalancer of RariFundController and RariFundManager to be set to process.env.DEVELOPMENT_ADDRESS

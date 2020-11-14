@@ -18,6 +18,13 @@ const RariFundManager = artifacts.require("RariFundManager");
 const RariFundToken = artifacts.require("RariFundToken");
 const RariFundPriceConsumer = artifacts.require("RariFundPriceConsumer");
 
+if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) {
+  RariFundController.address = process.env.UPGRADE_FUND_CONTROLLER_ADDRESS;
+  RariFundManager.address = process.env.UPGRADE_FUND_MANAGER_ADDRESS;
+  RariFundToken.address = process.env.UPGRADE_FUND_TOKEN_ADDRESS;
+  RariFundPriceConsumer.address = process.env.UPGRADE_FUND_PRICE_CONSUMER_ADDRESS;
+}
+
 const DummyRariFundController = artifacts.require("DummyRariFundController");
 const DummyRariFundManager = artifacts.require("DummyRariFundManager");
 
@@ -167,7 +174,9 @@ contract("RariFundManager", accounts => {
     // TODO: Check _fundDisabled (no way to do this as of now)
 
     // Upgrade FundManager
+    if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) RariFundManager.class_defaults.from = process.env.UPGRADE_FUND_OWNER_ADDRESS;
     var newFundManagerInstance = await upgradeProxy(RariFundManager.address, RariFundManager, { unsafeAllowCustomTypes: true });
+    if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) RariFundManager.class_defaults.from = process.env.DEVELOPMENT_ADDRESS;
 
     // Check balance of new FundManager
     let newRawFundBalance = await newFundManagerInstance.getRawFundBalance.call();

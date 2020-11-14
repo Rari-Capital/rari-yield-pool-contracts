@@ -229,6 +229,7 @@ contract RariFundManager is Initializable, Ownable {
         _interestFeesGeneratedAtLastFeeRateChange = data.interestFeesGeneratedAtLastFeeRateChange;
         _interestFeesClaimed = data.interestFeesClaimed;
         _interestFeeRate = RariFundManager(_authorizedFundManagerDataSource).getInterestFeeRate();
+        _withdrawalFeeRate = RariFundManager(_authorizedFundManagerDataSource).getWithdrawalFeeRate();
     }
 
     /**
@@ -575,7 +576,15 @@ contract RariFundManager is Initializable, Ownable {
     /**
      * @dev Emitted when funds have been withdrawn from RariFund.
      */
-    event Withdrawal(string indexed currencyCode, address indexed sender, address indexed payee, uint256 amount, uint256 amountUsd, uint256 rftBurned);
+    event Withdrawal(string indexed currencyCode, address indexed sender, address indexed payee, uint256 amount, uint256 amountUsd, uint256 rftBurned, uint256 withdrawalFeeRate, uint256 amountTransferred);
+
+    /**
+     * @dev Internal function to call the RGT distributor when the fund balance is updated so it can update RGT distribution speeds.
+     */
+    function updateRgtDistributionSpeeds() internal {
+        IRariGovernanceTokenDistributor rariGovernanceTokenDistributor = rariFundToken.rariGovernanceTokenDistributor();
+        if (address(rariGovernanceTokenDistributor) != address(0) && block.number < rariGovernanceTokenDistributor.distributionEndBlock()) rariGovernanceTokenDistributor.refreshDistributionSpeeds(IRariGovernanceTokenDistributor.RariPool.Yield, getFundBalance());
+    }
 
     /**
      * @notice Deposits funds from `msg.sender` to the Rari Yield Pool in exchange for RFT minted to `to`.
@@ -620,8 +629,7 @@ contract RariFundManager is Initializable, Ownable {
         _rawFundBalanceCache = _rawFundBalanceCache.add(int256(amountUsd));
 
         // Update RGT distribution speeds
-        IRariGovernanceTokenDistributor rariGovernanceTokenDistributor = rariFundToken.rariGovernanceTokenDistributor();
-        if (address(rariGovernanceTokenDistributor) != address(0) && block.number < rariGovernanceTokenDistributor.distributionEndBlock()) rariGovernanceTokenDistributor.refreshDistributionSpeeds(IRariGovernanceTokenDistributor.RariPool.Yield, getFundBalance());
+        updateRgtDistributionSpeeds();
 
         // Clear _rawFundBalanceCache
         if (!cacheSetPreviously) _rawFundBalanceCache = -1;
@@ -654,20 +662,15 @@ contract RariFundManager is Initializable, Ownable {
     }
 
     /**
-     * @dev Internal function to withdraw funds from the Rari Yield Pool to `msg.sender` in exchange for RFT burned from `from`.
-     * You may only withdraw currencies held by the fund (see `getRawFundBalance(string currencyCode)`).
-     * Please note that you must approve RariFundManager to burn of the necessary amount of RFT.
-     * @param from The address from which RFT will be burned.
+     * @dev Internal function to withdraw funds from pools if necessary for `RariFundController` to hold at least `amount` of actual tokens.
+     * This function was separated from `_withdrawFrom` to avoid the stack going too deep.
      * @param currencyCode The currency code of the token to be withdrawn.
-     * @param amount The amount of tokens to be withdrawn.
+     * @param amount The minimum amount of tokens that must be held by `RariFundController` after withdrawing.
+     * @return The actual amount withdrawn after potential yVault withdrawal fees.
      */
-    function _withdrawFrom(address from, string memory currencyCode, uint256 amount, uint256[] memory pricesInUsd) internal fundEnabled cachePoolBalances {
-        // Input validation
-        address erc20Contract = _erc20Contracts[currencyCode];
-        require(erc20Contract != address(0), "Invalid currency code.");
-        require(amount > 0, "Withdrawal amount must be greater than 0.");
-
+    function withdrawFromPoolsIfNecessary(string memory currencyCode, uint256 amount) internal returns (uint256) {
         // Check contract balance of token and withdraw from pools if necessary
+        address erc20Contract = _erc20Contracts[currencyCode];
         IERC20 token = IERC20(erc20Contract);
         uint256 contractBalance = token.balanceOf(_rariFundControllerContract);
 
@@ -690,10 +693,34 @@ contract RariFundManager is Initializable, Ownable {
 
         require(amount <= contractBalance, "Available balance not enough to cover amount even after withdrawing from pools.");
         uint256 realContractBalance = token.balanceOf(_rariFundControllerContract);
+        return realContractBalance < amount ? realContractBalance : amount;
+    }
+
+    /**
+     * @dev Internal function to withdraw funds from the Rari Yield Pool to `msg.sender` in exchange for RFT burned from `from`.
+     * You may only withdraw currencies held by the fund (see `getRawFundBalance(string currencyCode)`).
+     * Please note that you must approve RariFundManager to burn of the necessary amount of RFT.
+     * @param from The address from which RFT will be burned.
+     * @param currencyCode The currency code of the token to be withdrawn.
+     * @param amount The amount of tokens to be withdrawn.
+     * @return The amount withdrawn after the fee.
+     */
+    function _withdrawFrom(address from, string memory currencyCode, uint256 amount, uint256[] memory pricesInUsd) internal fundEnabled cachePoolBalances returns (uint256) {
+        // Input validation
+        address erc20Contract = _erc20Contracts[currencyCode];
+        require(erc20Contract != address(0), "Invalid currency code.");
+        require(amount > 0, "Withdrawal amount must be greater than 0.");
+
+        // Withdraw from pools if necessary
+        uint256 realAmountWithdrawn = withdrawFromPoolsIfNecessary(currencyCode, amount);
 
         // Manually cache raw fund balance
         bool cacheSetPreviously = _rawFundBalanceCache >= 0;
         if (!cacheSetPreviously) _rawFundBalanceCache = toInt256(getRawFundBalance(pricesInUsd));
+
+        // Calculate withdrawal fee and amount after fee
+        uint256 feeAmount = amount.mul(_withdrawalFeeRate).div(1e18);
+        uint256 amountAfterFee = amount.sub(feeAmount);
 
         // Get withdrawal amount in USD
         uint256 amountUsd = amount.mul(pricesInUsd[_currencyIndexes[currencyCode]]).div(10 ** _currencyDecimals[currencyCode]);
@@ -701,21 +728,25 @@ contract RariFundManager is Initializable, Ownable {
         // Calculate RFT to burn
         uint256 rftAmount = getRftBurnAmount(from, amountUsd);
 
-        // Update net deposits, burn RFT, transfer funds to msg.sender, and emit event
+        // Update net deposits, burn RFT, transfer funds to msg.sender, transfer fee to _withdrawalFeeMasterBeneficiary, and emit event
         _netDeposits = _netDeposits.sub(int256(amountUsd));
         rariFundToken.fundManagerBurnFrom(from, rftAmount); // The user must approve the burning of tokens beforehand
-        token.safeTransferFrom(_rariFundControllerContract, msg.sender, realContractBalance < amount ? realContractBalance : amount);
-        emit Withdrawal(currencyCode, from, msg.sender, amount, amountUsd, rftAmount);
+        IERC20 token = IERC20(erc20Contract);
+        token.safeTransferFrom(_rariFundControllerContract, msg.sender, realAmountWithdrawn < amountAfterFee ? realAmountWithdrawn : amountAfterFee);
+        if (realAmountWithdrawn > amountAfterFee) token.safeTransferFrom(_rariFundControllerContract, _withdrawalFeeMasterBeneficiary, realAmountWithdrawn.sub(amountAfterFee) < feeAmount ? realAmountWithdrawn.sub(amountAfterFee) : feeAmount);
+        emit Withdrawal(currencyCode, from, msg.sender, amount, amountUsd, rftAmount, _withdrawalFeeRate, realAmountWithdrawn < amountAfterFee ? realAmountWithdrawn : amountAfterFee);
 
         // Update _rawFundBalanceCache
         _rawFundBalanceCache = _rawFundBalanceCache.sub(int256(amountUsd));
 
         // Update RGT distribution speeds
-        IRariGovernanceTokenDistributor rariGovernanceTokenDistributor = rariFundToken.rariGovernanceTokenDistributor();
-        if (address(rariGovernanceTokenDistributor) != address(0) && block.number < rariGovernanceTokenDistributor.distributionEndBlock()) rariGovernanceTokenDistributor.refreshDistributionSpeeds(IRariGovernanceTokenDistributor.RariPool.Yield, getFundBalance());
+        updateRgtDistributionSpeeds();
 
         // Clear _rawFundBalanceCache
         if (!cacheSetPreviously) _rawFundBalanceCache = -1;
+
+        // Return amount after fee
+        return realAmountWithdrawn < amountAfterFee ? realAmountWithdrawn : amountAfterFee;
     }
 
     /**
@@ -724,9 +755,10 @@ contract RariFundManager is Initializable, Ownable {
      * Please note that you must approve RariFundManager to burn of the necessary amount of RFT.
      * @param currencyCode The currency code of the token to be withdrawn.
      * @param amount The amount of tokens to be withdrawn.
+     * @return The amount withdrawn after the fee.
      */
-    function withdraw(string calldata currencyCode, uint256 amount) external {
-        _withdrawFrom(msg.sender, currencyCode, amount, rariFundPriceConsumer.getCurrencyPricesInUsd());
+    function withdraw(string calldata currencyCode, uint256 amount) external returns (uint256) {
+        return _withdrawFrom(msg.sender, currencyCode, amount, rariFundPriceConsumer.getCurrencyPricesInUsd());
     }
 
     /**
@@ -736,9 +768,9 @@ contract RariFundManager is Initializable, Ownable {
      * @param from The address from which RFT will be burned.
      * @param currencyCodes The currency codes of the tokens to be withdrawn.
      * @param amounts The amounts of the tokens to be withdrawn.
-     * @return Boolean indicating success.
+     * @return Array of amounts withdrawn after fees.
      */
-    function withdrawFrom(address from, string[] calldata currencyCodes, uint256[] calldata amounts) external onlyProxy cachePoolBalances {
+    function withdrawFrom(address from, string[] calldata currencyCodes, uint256[] calldata amounts) external onlyProxy cachePoolBalances returns (uint256[] memory) {
         // Input validation
         require(currencyCodes.length > 0 && currencyCodes.length == amounts.length, "Lengths of currency code and amount arrays must be greater than 0 and equal.");
         uint256[] memory pricesInUsd = rariFundPriceConsumer.getCurrencyPricesInUsd();
@@ -747,10 +779,14 @@ contract RariFundManager is Initializable, Ownable {
         _rawFundBalanceCache = toInt256(getRawFundBalance(pricesInUsd));
 
         // Make withdrawals
-        for (uint256 i = 0; i < currencyCodes.length; i++) _withdrawFrom(from, currencyCodes[i], amounts[i], pricesInUsd);
+        uint256[] memory amountsAfterFees = new uint256[](currencyCodes.length);
+        for (uint256 i = 0; i < currencyCodes.length; i++) amountsAfterFees[i] = _withdrawFrom(from, currencyCodes[i], amounts[i], pricesInUsd);
 
         // Reset _rawFundBalanceCache
         _rawFundBalanceCache = -1;
+
+        // Return amounts withdrawn after fees
+        return amountsAfterFees;
     }
 
     /**
@@ -891,8 +927,7 @@ contract RariFundManager is Initializable, Ownable {
         emit InterestFeeDeposit(_interestFeeMasterBeneficiary, amountUsd);
 
         // Update RGT distribution speeds
-        IRariGovernanceTokenDistributor rariGovernanceTokenDistributor = rariFundToken.rariGovernanceTokenDistributor();
-        if (address(rariGovernanceTokenDistributor) != address(0) && block.number < rariGovernanceTokenDistributor.distributionEndBlock()) rariGovernanceTokenDistributor.refreshDistributionSpeeds(IRariGovernanceTokenDistributor.RariPool.Yield, getFundBalance());
+        updateRgtDistributionSpeeds();
 
         // Return no error
         return 0;
@@ -908,41 +943,47 @@ contract RariFundManager is Initializable, Ownable {
     }
 
     /**
-     * @notice Withdraws all accrued fees on interest to the master beneficiary.
-     * @param currencyCode The currency code of the interest fees to be claimed.
-     */
-    function withdrawFees(string calldata currencyCode) external fundEnabled onlyRebalancer {
-        // Input validation
-        require(_interestFeeMasterBeneficiary != address(0), "Master beneficiary cannot be the zero address.");
-        address erc20Contract = _erc20Contracts[currencyCode];
-        require(erc20Contract != address(0), "Invalid currency code.");
-
-        // Get currency prices
-        uint256[] memory pricesInUsd = rariFundPriceConsumer.getCurrencyPricesInUsd();
-
-        // Manually cache raw fund balance (no need to check if set previously because the function is external)
-        _rawFundBalanceCache = toInt256(getRawFundBalance(pricesInUsd));
-
-        // Get unclaimed interest fees, calculate withdrawal amount, and validate
-        uint256 amountUsd = getInterestFeesUnclaimed();
-        uint256 amount = amountUsd.mul(10 ** _currencyDecimals[currencyCode]).div(pricesInUsd[_currencyIndexes[currencyCode]]);
-        require(amount > 0, "No new fees are available to claim.");
-
-        // Update claimed interest fees, transfer tokens, and emit event
-        _interestFeesClaimed = _interestFeesClaimed.add(amountUsd);
-        IERC20(erc20Contract).safeTransferFrom(_rariFundControllerContract, _interestFeeMasterBeneficiary, amount);
-        emit InterestFeeWithdrawal(_interestFeeMasterBeneficiary, amountUsd, currencyCode, amount);
-
-        // Reset _rawFundBalanceCache
-        _rawFundBalanceCache = -1;
-    }
-
-    /**
      * @dev Converts an unsigned uint256 into a signed int256.
      * @param value The uint256 to convert.
      */
     function toInt256(uint256 value) internal pure returns (int256) {
         require(value < 2 ** 255, "SafeCast: value doesn't fit in an int256");
         return int256(value);
+    }
+
+    /**
+     * @dev The current withdrawal fee rate (scaled by 1e18).
+     */
+    uint256 private _withdrawalFeeRate;
+
+    /**
+     * @dev The master beneficiary of withdrawal fees; i.e., the recipient of all withdrawal fees.
+     */
+    address private _withdrawalFeeMasterBeneficiary;
+
+    /**
+     * @dev Returns the withdrawal fee rate (proportion of every withdrawal taken as a service fee scaled by 1e18).
+     */
+    function getWithdrawalFeeRate() public view returns (uint256) {
+        return _withdrawalFeeRate;
+    }
+
+    /**
+     * @dev Sets the withdrawal fee rate.
+     * @param rate The proportion of every withdrawal taken as a service fee (scaled by 1e18).
+     */
+    function setWithdrawalFeeRate(uint256 rate) external fundEnabled onlyOwner {
+        require(rate != _withdrawalFeeRate, "This is already the current withdrawal fee rate.");
+        require(rate <= 1e18, "The withdrawal fee rate cannot be greater than 100%.");
+        _withdrawalFeeRate = rate;
+    }
+
+    /**
+     * @dev Sets the master beneficiary of withdrawal fees.
+     * @param beneficiary The master beneficiary of withdrawal fees; i.e., the recipient of all withdrawal fees.
+     */
+    function setWithdrawalFeeMasterBeneficiary(address beneficiary) external fundEnabled onlyOwner {
+        require(beneficiary != address(0), "Master beneficiary cannot be the zero address.");
+        _withdrawalFeeMasterBeneficiary = beneficiary;
     }
 }

@@ -14,7 +14,7 @@ As follows are all deployments of our smart contracts on the Ethereum mainnet. S
 
 `RariFundManager` is the Rari Yield Pool's main contract: it handles deposits, withdrawals, USD balances, interest, fees, etc.
 
-**v1.0.0**: `0x59FA438cD0731EBF5F4cDCaf72D4960EFd13FCe6`
+**v1.1.0**: `0x59FA438cD0731EBF5F4cDCaf72D4960EFd13FCe6`
 
 ### `RariFundToken`
 
@@ -32,4 +32,14 @@ The Rari Yield Pool Token (RYPT) is an ERC20 token used to internally account fo
 
 `RariFundProxy` includes wrapper functions built on top of `RariFundManager`: exchange and deposit, withdraw and exchange, deposit without paying gas via the Gas Station Network (GSN).
 
-**v1.0.0**: `0x6dd8e1Df9F366e6494c2601e515813e0f9219A88`
+**v1.1.0**: (to be deployed)
+
+## Older Versions
+
+### `RariFundManager`
+
+* **v1.0.0**: `0x59FA438cD0731EBF5F4cDCaf72D4960EFd13FCe6`
+
+### `RariFundProxy`
+
+* **v1.0.0**: `0x6dd8e1Df9F366e6494c2601e515813e0f9219A88`

@@ -17,6 +17,11 @@ const pools = require('./fixtures/pools.json');
 const RariFundController = artifacts.require("RariFundController");
 const RariFundManager = artifacts.require("RariFundManager");
 
+if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) {
+  RariFundController.address = process.env.UPGRADE_FUND_CONTROLLER_ADDRESS;
+  RariFundManager.address = process.env.UPGRADE_FUND_MANAGER_ADDRESS;
+}
+
 // These tests expect the owner and the fund rebalancer of RariFundController and RariFundManager to be set to process.env.DEVELOPMENT_ADDRESS
 contract("RariFundController", accounts => {
   it("should upgrade the FundController with funds in all pools in all currencies without using too much gas", async () => {

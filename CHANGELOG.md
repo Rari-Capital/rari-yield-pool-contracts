@@ -1,5 +1,9 @@
 # Changelog
 
+## `v1.1.0` (contracts not yet deployed; all code not yet pushed)
+
+* Added 0.5% withdrawal fee (removing `RariFundManager.withdrawFees` to save gas).
+
 ## `v1.0.0` (contracts deployed 2020-10-20; all code pushed 2020-10-30)
 
 * Copied Rari Stable Pool `v2.0.0` at commit [8a0405e](https://github.com/Rari-Capital/rari-stable-pool-contracts/commit/8a0405e8dacf908c79b3fe2999c153f81fbb5108).
