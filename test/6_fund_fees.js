@@ -10,27 +10,23 @@
 const erc20Abi = require('./abi/ERC20.json');
 
 const currencies = require('./fixtures/currencies.json');
-const pools = require('./fixtures/pools.json');
 
 const RariFundController = artifacts.require("RariFundController");
 const RariFundManager = artifacts.require("RariFundManager");
 const RariFundToken = artifacts.require("RariFundToken");
-const RariFundPriceConsumer = artifacts.require("RariFundPriceConsumer");
 
 if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) {
   RariFundController.address = process.env.UPGRADE_FUND_CONTROLLER_ADDRESS;
   RariFundManager.address = process.env.UPGRADE_FUND_MANAGER_ADDRESS;
   RariFundToken.address = process.env.UPGRADE_FUND_TOKEN_ADDRESS;
-  RariFundPriceConsumer.address = process.env.UPGRADE_FUND_PRICE_CONSUMER_ADDRESS;
 }
 
 // These tests expect the owner and the fund rebalancer of RariFundController and RariFundManager to be set to process.env.DEVELOPMENT_ADDRESS
 contract("RariFundManager", accounts => {
   it("should deposit to pools, set the interest fee rate, wait for interest, set the master beneficiary of interest fees, and deposit fees", async () => {
-    let fundControllerInstance = await RariFundController.deployed();
-    let fundManagerInstance = await RariFundManager.deployed();
-    let fundTokenInstance = await RariFundToken.deployed();
-    let fundPriceConsumerInstance = await RariFundPriceConsumer.deployed();
+    let fundControllerInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundController.at(process.env.UPGRADE_FUND_CONTROLLER_ADDRESS) : RariFundController.deployed());
+    let fundManagerInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundManager.at(process.env.UPGRADE_FUND_MANAGER_ADDRESS) : RariFundManager.deployed());
+    let fundTokenInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundToken.at(process.env.UPGRADE_FUND_TOKEN_ADDRESS) : RariFundToken.deployed());
 
     // Approve and deposit tokens to the fund (using DAI as an example)
     var currencyCode = "DAI";

@@ -18,8 +18,8 @@ const RariFundToken = artifacts.require("RariFundToken");
 const RariFundProxy = artifacts.require("RariFundProxy");
 
 if (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0) {
-  RariFundController.address = process.env.UPGRADE_FUND_CONTROLLER_ADDRESS;
   RariFundManager.address = process.env.UPGRADE_FUND_MANAGER_ADDRESS;
+  RariFundToken.address = process.env.UPGRADE_FUND_TOKEN_ADDRESS;
 }
 
 function get0xSwapOrders(inputTokenAddress, outputTokenAddress, maxInputAmountBN, maxMakerAssetFillAmountBN) {
@@ -117,8 +117,8 @@ function get0xSwapOrders(inputTokenAddress, outputTokenAddress, maxInputAmountBN
 
 contract("RariFundProxy", accounts => {
   it("should withdraw and exchange all input currencies without using too much gas", async () => {
-    let fundManagerInstance = await RariFundManager.deployed();
-    let fundTokenInstance = await RariFundToken.deployed();
+    let fundManagerInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundManager.at(process.env.UPGRADE_FUND_MANAGER_ADDRESS) : RariFundManager.deployed());
+    let fundTokenInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundToken.at(process.env.UPGRADE_FUND_TOKEN_ADDRESS) : RariFundToken.deployed());
     let fundProxyInstance = await RariFundProxy.deployed();
 
     // Exchange data

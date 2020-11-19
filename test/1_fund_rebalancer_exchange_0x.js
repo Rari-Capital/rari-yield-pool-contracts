@@ -27,8 +27,8 @@ var zeroExExchange = new ZeroExExchange(web3);
 // These tests expect the owner and the fund rebalancer of RariFundController and RariFundManager to be set to process.env.DEVELOPMENT_ADDRESS
 contract("RariFundController, RariFundManager", accounts => {
   it("should exchange tokens", async () => {
-    let fundControllerInstance = await RariFundController.deployed();
-    let fundManagerInstance = await RariFundManager.deployed();
+    let fundControllerInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundController.at(process.env.UPGRADE_FUND_CONTROLLER_ADDRESS) : RariFundController.deployed());
+    let fundManagerInstance = await (parseInt(process.env.UPGRADE_FROM_LAST_VERSION) > 0 ? RariFundManager.at(process.env.UPGRADE_FUND_MANAGER_ADDRESS) : RariFundManager.deployed());
 
     // For each currency combination, calculate amount to deposit to the fund
     var deposits = {};
