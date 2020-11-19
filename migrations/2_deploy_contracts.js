@@ -73,8 +73,6 @@ module.exports = async function(deployer, network, accounts) {
       var rariFundController = await RariFundController.at(process.env.UPGRADE_FUND_CONTROLLER_ADDRESS);
       await rariFundController.transferOwnership(process.env.DEVELOPMENT_ADDRESS, { from: process.env.UPGRADE_FUND_OWNER_ADDRESS });
       await rariFundManager.transferOwnership(process.env.DEVELOPMENT_ADDRESS, { from: process.env.UPGRADE_FUND_OWNER_ADDRESS });
-      var rariFundToken = await RariFundToken.at(process.env.UPGRADE_FUND_TOKEN_ADDRESS);
-      await rariFundToken.addPauser(process.env.LIVE_FUND_OWNER);
       // TODO: await admin.transferProxyAdminOwnership(process.env.DEVELOPMENT_ADDRESS, { from: process.env.UPGRADE_FUND_OWNER_ADDRESS });
       await rariFundController.setFundRebalancer(process.env.DEVELOPMENT_ADDRESS);
       RariFundManager.class_defaults.from = process.env.DEVELOPMENT_ADDRESS;
@@ -82,7 +80,6 @@ module.exports = async function(deployer, network, accounts) {
       await rariFundManager.setAcceptedCurrencies(["DAI", "USDC", "USDT", "TUSD", "BUSD", "sUSD", "mUSD"], [true, true, true, true, true, true, true]);
     }
   } else {
-
     // Normal deployment!
     // Deploy liquidity pool and currency exchange libraries
     await deployer.deploy(DydxPoolController);
@@ -140,6 +137,12 @@ module.exports = async function(deployer, network, accounts) {
 
     // Set interest fee rate to 9.5%
     await rariFundManager.setInterestFeeRate(web3.utils.toBN(0.095e18));
+  
+    // Set withdrawal fee master beneficiary
+    await rariFundManager.setWithdrawalFeeMasterBeneficiary(["live", "live-fork"].indexOf(network) >= 0 ? process.env.LIVE_FUND_WITHDRAWAL_FEE_MASTER_BENEFICIARY : process.env.DEVELOPMENT_ADDRESS);
+  
+    // Set withdrawal fee rate to 0.5%
+    await rariFundManager.setWithdrawalFeeRate(web3.utils.toBN(0.005e18));
 
     // Link libraries to RariFundProxy
     await deployer.link(ZeroExExchangeController, RariFundProxy);
