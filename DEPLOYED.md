@@ -32,7 +32,7 @@ The Rari Yield Pool Token (RYPT) is an ERC20 token used to internally account fo
 
 `RariFundProxy` includes wrapper functions built on top of `RariFundManager`: exchange and deposit, withdraw and exchange, deposit without paying gas via the Gas Station Network (GSN).
 
-**v1.1.0**: `0x626d6979F3607d13051594d8B27a0A64E413bC11`
+**v1.2.0**: `0x35DDEFa2a30474E64314aAA7370abE14c042C6e8`
 
 ## Older Versions
 
@@ -42,4 +42,5 @@ The Rari Yield Pool Token (RYPT) is an ERC20 token used to internally account fo
 
 ### `RariFundProxy`
 
+* **v1.1.0**: `0x626d6979F3607d13051594d8B27a0A64E413bC11`
 * **v1.0.0**: `0x6dd8e1Df9F366e6494c2601e515813e0f9219A88`
