@@ -4,7 +4,7 @@
 
 * Fixed bug in validation of mUSD redemption in `RariFundController.withdrawAndExchange`.
 
-## `v1.1.0` (contracts deployed 2020-11-19; all code pushed 2020-11-24)
+## `v1.1.0` (contracts deployed 2020-11-19; all code pushed 2020-11-29)
 
 * Added 0.5% withdrawal fee (removing `RariFundManager.withdrawFees` to save gas).
 
