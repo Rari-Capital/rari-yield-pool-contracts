@@ -1,6 +1,6 @@
 # Changelog
 
-## `v1.1.0` (contracts not yet deployed; all code not yet pushed)
+## `v1.1.0` (contracts deployed 2020-11-19; all code pushed 2020-11-29)
 
 * Added 0.5% withdrawal fee (removing `RariFundManager.withdrawFees` to save gas).
 
