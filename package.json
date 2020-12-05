@@ -1,6 +1,6 @@
 {
   "name": "rari-yield-pool-contracts",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Smart contracts for the Rari Yield Pool.",
   "main": "truffle-config.js",
   "directories": {
