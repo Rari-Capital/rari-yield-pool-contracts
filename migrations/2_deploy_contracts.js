@@ -39,10 +39,6 @@ module.exports = async function(deployer, network, accounts) {
     if (!process.env.UPGRADE_FUND_OWNER_ADDRESS) return console.error("UPGRADE_FUND_OWNER_ADDRESS is missing for upgrade");
     if (["live", "live-fork"].indexOf(network) >= 0 && !process.env.LIVE_UPGRADE_FUND_OWNER_PRIVATE_KEY) return console.error("LIVE_UPGRADE_FUND_OWNER_PRIVATE_KEY is missing for live upgrade");
 
-    // Upgrade from v1.2.0 (RariFundManager v1.1.0) to v1.3.0
-    RariFundManager.class_defaults.from = process.env.UPGRADE_FUND_OWNER_ADDRESS;
-    var rariFundManager = await upgradeProxy(process.env.UPGRADE_FUND_MANAGER_ADDRESS, RariFundManager, { deployer, unsafeAllowCustomTypes: true });
-
     // Upgrade from v1.2.0 (RariFundController v1.0.0) to v1.3.0
     var oldRariFundController = await RariFundController.at(process.env.UPGRADE_OLD_FUND_CONTROLLER);
 
@@ -70,8 +66,10 @@ module.exports = async function(deployer, network, accounts) {
     // Disable the fund on the old RariFundController
     await oldRariFundController.setFundDisabled(true, { from: process.env.UPGRADE_FUND_OWNER_ADDRESS });
 
-    // Disable the fund on the RariFundManager
+    // Disable the fund on the RariFundManager and set fund controller to 0x0 (so getFundBalance reverts)
+    var rariFundManager = await RariFundManager.at(process.env.UPGRADE_FUND_MANAGER_ADDRESS);
     await rariFundManager.setFundDisabled(true);
+    await rariFundManager.setFundController("0x0000000000000000000000000000000000000000");
 
     // Upgrade RariFundController
     await oldRariFundController.upgradeFundController(RariFundController.address, { from: process.env.UPGRADE_FUND_OWNER_ADDRESS });
@@ -83,7 +81,7 @@ module.exports = async function(deployer, network, accounts) {
     for (const currencyCode of ["DAI", "USDC", "USDT", "TUSD"]) if (await newFundControllerInstance.checkPoolForFunds.call(4, currencyCode)) await newFundControllerInstance.checkPoolForFunds(4, currencyCode);
 
     // Connect new RariFundController and RariFundManager
-    await rariFundController.setFundManager(RariFundManager.address);
+    await rariFundController.setFundManager(process.env.UPGRADE_FUND_MANAGER_ADDRESS);
     await rariFundManager.setFundController(RariFundController.address);
 
     // Re-enable the fund on the RariFundManager
