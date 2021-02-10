@@ -133,7 +133,7 @@ module.exports = async function(deployer, network, accounts) {
 
     // Deploy RariFundController and RariFundManager
     var rariFundController = await deployer.deploy(RariFundController);
-    var rariFundManager = await deployProxy(RariFundManager, [], { deployer, unsafeAllowCustomTypes: true });
+    var rariFundManager = await deployProxy(RariFundManager, [], { deployer });
 
     // Connect RariFundController and RariFundManager
     await rariFundController.setFundManager(RariFundManager.address);
