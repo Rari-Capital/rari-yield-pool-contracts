@@ -2,7 +2,7 @@
 
 ## `v1.3.0` (contracts deployed 2020-02-14; all code pushed 2020-02-14)
 
-* Upgraded mStable SAVE V1 to V2.
+* Upgraded mStable SAVE V1 to V2 (and implemented MTA rewards).
 * Fixed bug in calculation of `outputFilledAmountUsd` in `RariFundController.marketSell0xOrdersFillOrKill`.
 
 ## `v1.2.1` (no contracts deployed; all code pushed 2020-12-07)
