@@ -159,17 +159,21 @@ contract RariFundController is Ownable {
      * @param newContract The address of the new RariFundController contract.
      */
     function upgradeFundController(address payable newContract) external onlyOwner {
+        // Verify fund is disabled + verify new fund controller contract
         require(fundDisabled, "This fund controller contract must be disabled before it can be upgraded.");
         require(RariFundController(newContract).IS_RARI_FUND_CONTROLLER(), "New contract does not have IS_RARI_FUND_CONTROLLER set to true.");
 
+        // Loop through all currencies
         for (uint256 i = 0; i < _supportedCurrencies.length; i++) {
             string memory currencyCode = _supportedCurrencies[i];
 
+            // Loop through all pools; if a pool has a balance in this currency, transfer it directly to the new contract or withdraw it
             for (uint256 j = 0; j < _poolsByCurrency[currencyCode].length; j++) if (hasCurrencyInPool(_poolsByCurrency[currencyCode][j], currencyCode)) {
                 if (_poolsByCurrency[currencyCode][j] == LiquidityPool.yVault) YVaultPoolController.transferAll(_erc20Contracts[currencyCode], newContract);
                 else _withdrawAllFromPool(_poolsByCurrency[currencyCode][j], currencyCode);
             }
 
+            // Transfer entire balance of this token
             IERC20 token = IERC20(_erc20Contracts[currencyCode]);
             uint256 balance = token.balanceOf(address(this));
             if (balance > 0) token.safeTransfer(newContract, balance);
@@ -183,8 +187,11 @@ contract RariFundController is Ownable {
      * @return Boolean indicating if the balance transferred was greater than 0.
      */
     function upgradeFundController(address payable newContract, address erc20Contract) external onlyOwner returns (bool) {
+        // Verify fund is disabled + verify new fund controller contract
         require(fundDisabled, "This fund controller contract must be disabled before it can be upgraded.");
         require(RariFundController(newContract).IS_RARI_FUND_CONTROLLER(), "New contract does not have IS_RARI_FUND_CONTROLLER set to true.");
+
+        // Transfer entire balance of this token
         IERC20 token = IERC20(erc20Contract);
         uint256 balance = token.balanceOf(address(this));
         if (balance <= 0) return false;
@@ -221,6 +228,7 @@ contract RariFundController is Ownable {
             if (newContract != address(0)) token.safeApprove(newContract, uint256(-1));
         }
 
+        // Set new RariFundManager contract and emit event
         _rariFundManagerContract = newContract;
         rariFundManager = RariFundManager(_rariFundManagerContract);
         emit FundManagerSet(newContract);
@@ -441,7 +449,7 @@ contract RariFundController is Ownable {
      * @param all Boolean indicating if all funds are being withdrawn.
      */
     function withdrawFromPoolOptimized(LiquidityPool pool, string calldata currencyCode, uint256 amount, bool all) external fundEnabled onlyManager {
-        all && (pool == LiquidityPool.dYdX || pool == LiquidityPool.mStable || pool == LiquidityPool.yVault) ? _withdrawAllFromPool(pool, currencyCode) : _withdrawFromPool(pool, currencyCode, amount);
+        all ? _withdrawAllFromPool(pool, currencyCode) : _withdrawFromPool(pool, currencyCode, amount);
         if (all) _poolsWithFunds[currencyCode][uint8(pool)] = false;
     }
 
@@ -570,7 +578,7 @@ contract RariFundController is Ownable {
 
         if (inputErc20Contract != address(0)) {
             inputFilledAmountUsd = toUsd(inputCurrencyCode, filledAmounts[0], pricesInUsd);
-            outputFilledAmountUsd = toUsd(inputCurrencyCode, filledAmounts[1], pricesInUsd);
+            outputFilledAmountUsd = toUsd(outputCurrencyCode, filledAmounts[1], pricesInUsd);
             handleExchangeLoss(inputFilledAmountUsd, outputFilledAmountUsd, rawFundBalanceBeforeExchange);
         }
 
@@ -672,5 +680,15 @@ contract RariFundController is Ownable {
 
         // Emit event
         emit CurrencyTrade(inputCurrencyCode, outputCurrencyCode, inputAmount, inputFilledAmountUsd, outputAmount, outputFilledAmountUsd, CurrencyExchange.mStable);
+    }
+
+    /**
+     * @dev Claims mStable MTA rewards (if `all` is set, unlocks and claims locked rewards).
+     * @param all If locked rewards should be unlocked and claimed.
+     * @param first Index of the first array element to claim. Only applicable if `all` is true. Feed in the second value returned by the savings vault's `unclaimedRewards(address _account)` function.
+     * @param last Index of the last array element to claim. Only applicable if `all` is true. Feed in the third value returned by the savings vault's `unclaimedRewards(address _account)` function.
+     */
+    function claimMStableRewards(bool all, uint256 first, uint256 last) external fundEnabled onlyRebalancer {
+        MStablePoolController.claimRewards(all, first, last);
     }
 }
